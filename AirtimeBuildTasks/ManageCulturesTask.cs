@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -32,7 +33,12 @@ namespace AirtimeBuildTasks
                     .Select(x => x.Value.Trim())
                     .ToList();
 
-                cultureCodes.ForEach(RegisterCulture);
+                try {
+                    cultureCodes.ForEach(RegisterCulture);
+                } catch (UnauthorizedAccessException) {
+                    Log.LogError("ManageCulturesTask failed: Insufficient privileges to register supplementary cultures; please try again as a system Administrator, or manually use the ManageCultures tool to ensure the following cultures are registered: {0}", String.Join(", ", cultureCodes));
+                    return false;
+                }
 
             } catch (Exception ex) {
                 Log.LogError($"ManageCulturesTask failed: {ex.Message}");
