@@ -33,45 +33,58 @@ namespace AirtimeBuildTasks
 				}
 
 				var tagPattern = new Regex(VersionTagFormat.Replace("0", @"\d").Replace(".", @"\."), RegexOptions.Compiled);
-				string template = File.ReadAllText(TemplateFile);
 
-				using (var repo = new Repository(RepositoryDirectory)) {
-					var result = FindLatestMatchingTag(repo, tagPattern);
-
-					Dictionary<string, object> valuesLookup;
-					if (result.Tag != null) {
-						var match = VersionNumberPattern.Match(result.Tag.Name);
-						valuesLookup = new Dictionary<string, object> {
-							["Year"] = DateTime.Now.Year,
-							["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8),
-							["CommitHashLong"] = result.Commit?.Sha,
-							["TagDistance"] = result.Distance,
-							["VersionTag"] = result.Tag.Name,
-							["VersionTagNumber"] = match.Value,
-							["VersionTagMajor"] = match.Groups["major"].Value,
-							["VersionTagMinor"] = match.Groups["minor"].Value,
-							["VersionTagBuild"] = match.Groups["build"].Value,
-							["VersionTagRevision"] = match.Groups["revision"].Value
-						};
-
-					} else {
-						var match = VersionNumberPattern.Match(VersionTagFormat);
-						valuesLookup = new Dictionary<string, object> {
-							["Year"] = DateTime.Now.Year,
-							["CommitHashShort"] = new String('0', 8),
-							["CommitHashLong"] = "",
-							["TagDistance"] = 0,
-							["VersionTag"] = VersionTagFormat,
-							["VersionTagNumber"] = match.Value,
-							["VersionTagMajor"] = match.Groups["major"].Value,
-							["VersionTagMinor"] = match.Groups["minor"].Value,
-							["VersionTagBuild"] = match.Groups["build"].Value,
-							["VersionTagRevision"] = match.Groups["revision"].Value
-						};
-					}
-
-					File.WriteAllText(OutputFile, template.NamedFormat(valuesLookup));
+				string template;
+				using (var inStream = new FileStream(TemplateFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+				using (var reader = new StreamReader(inStream)) {
+					template = reader.ReadToEnd();
 				}
+
+				using (var outStream = new FileStream(OutputFile, FileMode.Create, FileAccess.Write, FileShare.None)) {
+					using (var repo = new Repository(RepositoryDirectory)) {
+						var result = FindLatestMatchingTag(repo, tagPattern);
+
+						Dictionary<string, object> valuesLookup;
+						if (result.Tag != null) {
+							var match = VersionNumberPattern.Match(result.Tag.Name);
+							valuesLookup = new Dictionary<string, object> {
+								["Year"] = DateTime.Now.Year,
+								["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8),
+								["CommitHashLong"] = result.Commit?.Sha,
+								["TagDistance"] = result.Distance,
+								["VersionTag"] = result.Tag.Name,
+								["VersionTagNumber"] = match.Value,
+								["VersionTagMajor"] = match.Groups["major"].Value,
+								["VersionTagMinor"] = match.Groups["minor"].Value,
+								["VersionTagBuild"] = match.Groups["build"].Value,
+								["VersionTagRevision"] = match.Groups["revision"].Value
+							};
+
+						} else {
+							var match = VersionNumberPattern.Match(VersionTagFormat);
+							valuesLookup = new Dictionary<string, object> {
+								["Year"] = DateTime.Now.Year,
+								["CommitHashShort"] = new String('0', 8),
+								["CommitHashLong"] = "",
+								["TagDistance"] = 0,
+								["VersionTag"] = VersionTagFormat,
+								["VersionTagNumber"] = match.Value,
+								["VersionTagMajor"] = match.Groups["major"].Value,
+								["VersionTagMinor"] = match.Groups["minor"].Value,
+								["VersionTagBuild"] = match.Groups["build"].Value,
+								["VersionTagRevision"] = match.Groups["revision"].Value
+							};
+						}
+
+						using (var writer = new StreamWriter(outStream)) {
+							writer.Write(template.NamedFormat(valuesLookup));
+						}
+					}
+				}
+
+			} catch (IOException ex) {
+				Log.LogMessage(MessageImportance.Low, $"{GetType()?.Name} warning: {ex.Message}");
+				return true;
 
 			} catch (RepositoryNotFoundException ex) {
 				Log.LogWarning($"{ex.Message}");
