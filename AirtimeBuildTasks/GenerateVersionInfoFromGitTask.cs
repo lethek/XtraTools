@@ -44,37 +44,20 @@ namespace AirtimeBuildTasks
 					using (var repo = new Repository(RepositoryDirectory)) {
 						var result = FindLatestMatchingTag(repo, tagPattern);
 
-						Dictionary<string, object> valuesLookup;
-						if (result.Tag != null) {
-							var match = VersionNumberPattern.Match(result.Tag.Name);
-							valuesLookup = new Dictionary<string, object> {
-								["Year"] = DateTime.Now.Year,
-								["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8),
-								["CommitHashLong"] = result.Commit?.Sha,
-								["TagDistance"] = result.Distance,
-								["VersionTag"] = result.Tag.Name,
-								["VersionTagNumber"] = match.Value,
-								["VersionTagMajor"] = match.Groups["major"].Value,
-								["VersionTagMinor"] = match.Groups["minor"].Value,
-								["VersionTagBuild"] = match.Groups["build"].Value,
-								["VersionTagRevision"] = match.Groups["revision"].Value
-							};
-
-						} else {
-							var match = VersionNumberPattern.Match(VersionTagFormat);
-							valuesLookup = new Dictionary<string, object> {
-								["Year"] = DateTime.Now.Year,
-								["CommitHashShort"] = new String('0', 8),
-								["CommitHashLong"] = "",
-								["TagDistance"] = 0,
-								["VersionTag"] = VersionTagFormat,
-								["VersionTagNumber"] = match.Value,
-								["VersionTagMajor"] = match.Groups["major"].Value,
-								["VersionTagMinor"] = match.Groups["minor"].Value,
-								["VersionTagBuild"] = match.Groups["build"].Value,
-								["VersionTagRevision"] = match.Groups["revision"].Value
-							};
-						}
+						var match = VersionNumberPattern.Match(result.Tag?.Name ?? VersionTagFormat);
+						var valuesLookup = new Dictionary<string, object> {
+							["Year"] = DateTime.Now.Year,
+							["Branch"] = result.Branch,
+							["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8) ?? new String('0', 8),
+							["CommitHashLong"] = result.Commit?.Sha,
+							["TagDistance"] = result.Distance,
+							["VersionTag"] = result.Tag?.Name ?? VersionTagFormat,
+							["VersionTagNumber"] = match.Value,
+							["VersionTagMajor"] = match.Groups["major"].Value,
+							["VersionTagMinor"] = match.Groups["minor"].Value,
+							["VersionTagBuild"] = match.Groups["build"].Value,
+							["VersionTagRevision"] = match.Groups["revision"].Value,
+						};
 
 						using (var writer = new StreamWriter(outStream)) {
 							writer.Write(template.NamedFormat(valuesLookup));
@@ -87,7 +70,7 @@ namespace AirtimeBuildTasks
 				return true;
 
 			} catch (RepositoryNotFoundException ex) {
-				Log.LogWarning($"{ex.Message}");
+				Log.LogWarning($"{GetType()?.Name} warning: {ex.Message}");
 				return true;
 
 			} catch (Exception ex) {
@@ -99,42 +82,31 @@ namespace AirtimeBuildTasks
 		}
 
 
-		private static TagSearchResult FindLatestMatchingTag(IRepository repo, Regex matchTagName, string sha)
-		{
-			var tip = repo.Lookup<Commit>(sha);
-			if (tip == null) {
-				throw new ArgumentException($"Commit hash not found: {sha}", nameof(sha));
-			}
-
-			return FindLatestMatchingTag(repo, matchTagName, tip);
-		}
-
-
-		private static TagSearchResult FindLatestMatchingTag(IRepository repo, Regex matchTagName, Commit tip = null)
+		private static TagSearchResult FindLatestMatchingTag(IRepository repo, Regex matchTagName)
 		{
 			int distance = 0;
 			Tag matchedTag = null;
+			var tip = repo.Head.Tip;
 
-			if (tip == null) {
-				tip = repo.Head.Tip;
-			}
+			if (tip != null) {
+				var tags = repo.Tags
+					.Where(x => matchTagName.IsMatch(x.Name))
+					.ToDictionary(x => x.Target.Sha);
 
-			var tags = repo.Tags
-				.Where(x => matchTagName.IsMatch(x.Name))
-				.ToDictionary(x => x.Target.Sha);
-
-			foreach (var commit in repo.Commits.QueryBy(new CommitFilter { Since = tip })) {
-				tags.TryGetValue(commit.Sha, out matchedTag);
-				if (matchedTag != null) {
-					break;
+				foreach (var commit in repo.Commits.QueryBy(new CommitFilter { Since = tip })) {
+					tags.TryGetValue(commit.Sha, out matchedTag);
+					if (matchedTag != null) {
+						break;
+					}
+					distance++;
 				}
-				distance++;
 			}
 
 			return new TagSearchResult() {
 				Commit = tip,
 				Tag = matchedTag,
-				Distance = distance
+				Distance = distance,
+				Branch = (repo.Info.IsHeadUnborn || repo.Info.IsHeadDetached) ? "no branch" : repo.Head.Name
 			};
 		}
 
@@ -143,6 +115,7 @@ namespace AirtimeBuildTasks
 			public Tag Tag { get; set; }
 			public Commit Commit { get; set; }
 			public int Distance { get; set; }
+			public string Branch { get; set; }
 		}
 
 
