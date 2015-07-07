@@ -34,41 +34,39 @@ namespace AirtimeBuildTasks
 
 				var tagPattern = new Regex(VersionTagFormat.Replace("0", @"\d").Replace(".", @"\."), RegexOptions.Compiled);
 
-				string template;
-				using (var inStream = new FileStream(TemplateFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-				using (var reader = new StreamReader(inStream)) {
-					template = reader.ReadToEnd();
+				string template = ReadFile(TemplateFile);
+				string oldOutput = ReadFile(OutputFile);
+				string newOutput;
+
+				using (var repo = new Repository(RepositoryDirectory)) {
+					var result = FindLatestMatchingTag(repo, tagPattern);
+					var match = VersionNumberPattern.Match(result.Tag?.Name ?? VersionTagFormat);
+					var valuesLookup = new Dictionary<string, object> {
+						["Year"] = DateTime.Now.Year,
+						["Branch"] = result.Branch,
+						["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8) ?? new String('0', 8),
+						["CommitHashLong"] = result.Commit?.Sha,
+						["TagDistance"] = result.Distance,
+						["VersionTag"] = result.Tag?.Name ?? VersionTagFormat,
+						["VersionTagNumber"] = match.Value,
+						["VersionTagMajor"] = match.Groups["major"].Value,
+						["VersionTagMinor"] = match.Groups["minor"].Value,
+						["VersionTagBuild"] = match.Groups["build"].Value,
+						["VersionTagRevision"] = match.Groups["revision"].Value,
+					};
+					newOutput = template.NamedFormat(valuesLookup);
 				}
 
-				using (var outStream = new FileStream(OutputFile, FileMode.Create, FileAccess.Write, FileShare.None)) {
-					using (var repo = new Repository(RepositoryDirectory)) {
-						var result = FindLatestMatchingTag(repo, tagPattern);
-
-						var match = VersionNumberPattern.Match(result.Tag?.Name ?? VersionTagFormat);
-						var valuesLookup = new Dictionary<string, object> {
-							["Year"] = DateTime.Now.Year,
-							["Branch"] = result.Branch,
-							["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8) ?? new String('0', 8),
-							["CommitHashLong"] = result.Commit?.Sha,
-							["TagDistance"] = result.Distance,
-							["VersionTag"] = result.Tag?.Name ?? VersionTagFormat,
-							["VersionTagNumber"] = match.Value,
-							["VersionTagMajor"] = match.Groups["major"].Value,
-							["VersionTagMinor"] = match.Groups["minor"].Value,
-							["VersionTagBuild"] = match.Groups["build"].Value,
-							["VersionTagRevision"] = match.Groups["revision"].Value,
-						};
-
-						using (var writer = new StreamWriter(outStream)) {
-							writer.Write(template.NamedFormat(valuesLookup));
-						}
-					}
+				if (oldOutput != newOutput) {
+					File.WriteAllText(OutputFile, newOutput);
 				}
 
 			} catch (IOException ex) {
 				Log.LogMessage(MessageImportance.Low, $"{GetType()?.Name} warning: {ex.Message}");
 				return true;
-
+			} catch (UnauthorizedAccessException ex) {
+				Log.LogMessage(MessageImportance.Low, $"{GetType()?.Name} warning: {ex.Message}");
+				return true;
 			} catch (RepositoryNotFoundException ex) {
 				Log.LogWarning($"{GetType()?.Name} warning: {ex.Message}");
 				return true;
@@ -79,6 +77,21 @@ namespace AirtimeBuildTasks
 			}
 
 			return true;
+		}
+
+
+		private static string ReadFile(string filePath)
+		{
+			try {
+				using (var inStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+				using (var reader = new StreamReader(inStream)) {
+					return reader.ReadToEnd();
+				}
+			} catch (DirectoryNotFoundException) {
+				return String.Empty;
+			} catch (FileNotFoundException) {
+				return String.Empty;
+			}
 		}
 
 
