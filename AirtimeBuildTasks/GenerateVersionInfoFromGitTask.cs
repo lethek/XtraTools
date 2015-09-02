@@ -32,7 +32,7 @@ namespace AirtimeBuildTasks
 					throw new Exception($"Could not find TemplateFile \"{TemplateFile}\"");
 				}
 
-				var tagPattern = new Regex(VersionTagFormat.Replace("0", @"\d").Replace(".", @"\."), RegexOptions.Compiled);
+				var tagPattern = new Regex(VersionTagFormat.Replace("0", @"\d+").Replace(".", @"\."), RegexOptions.Compiled);
 
 				string template = ReadFile(TemplateFile);
 				string oldOutput = ReadFile(OutputFile);
