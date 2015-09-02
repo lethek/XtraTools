@@ -102,12 +102,12 @@ namespace AirtimeBuildTasks
 			var tip = repo.Head.Tip;
 
 			if (tip != null) {
-				var tags = repo.Tags
+				var matchedTags = repo.Tags
 					.Where(x => matchTagName.IsMatch(x.Name))
-					.ToDictionary(x => x.Target.Sha);
+					.ToLookup(x => x.Target.Sha);
 
 				foreach (var commit in repo.Commits.QueryBy(new CommitFilter { Since = tip })) {
-					tags.TryGetValue(commit.Sha, out matchedTag);
+					matchedTag = matchedTags[commit.Sha].FirstOrDefault();
 					if (matchedTag != null) {
 						break;
 					}
@@ -115,7 +115,7 @@ namespace AirtimeBuildTasks
 				}
 			}
 
-			return new TagSearchResult() {
+			return new TagSearchResult {
 				Commit = tip,
 				Tag = matchedTag,
 				Distance = distance,
