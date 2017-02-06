@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+
 using LibGit2Sharp;
+
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
@@ -40,14 +42,14 @@ namespace AirtimeBuildTasks
 
 				using (var repo = new Repository(RepositoryDirectory)) {
 					var result = FindLatestMatchingTag(repo, tagPattern);
-					var match = VersionNumberPattern.Match(result.Tag?.Name ?? VersionTagFormat);
+					var match = VersionNumberPattern.Match(result.Tag?.FriendlyName ?? VersionTagFormat);
 					var valuesLookup = new Dictionary<string, object> {
 						["Year"] = DateTime.Now.Year,
 						["Branch"] = result.Branch,
 						["CommitHashShort"] = result.Commit?.Sha.Substring(0, 8) ?? new String('0', 8),
 						["CommitHashLong"] = result.Commit?.Sha,
 						["TagDistance"] = result.Distance,
-						["VersionTag"] = result.Tag?.Name ?? VersionTagFormat,
+						["VersionTag"] = result.Tag?.FriendlyName ?? VersionTagFormat,
 						["VersionTagNumber"] = match.Value,
 						["VersionTagMajor"] = match.Groups["major"].Value,
 						["VersionTagMinor"] = match.Groups["minor"].Value,
@@ -103,10 +105,10 @@ namespace AirtimeBuildTasks
 
 			if (tip != null) {
 				var matchedTags = repo.Tags
-					.Where(x => matchTagName.IsMatch(x.Name))
+					.Where(x => matchTagName.IsMatch(x.FriendlyName))
 					.ToLookup(x => x.Target.Sha);
 
-				foreach (var commit in repo.Commits.QueryBy(new CommitFilter { Since = tip })) {
+				foreach (var commit in repo.Commits.QueryBy(new CommitFilter { IncludeReachableFrom = tip })) {
 					matchedTag = matchedTags[commit.Sha].FirstOrDefault();
 					if (matchedTag != null) {
 						break;
@@ -119,7 +121,7 @@ namespace AirtimeBuildTasks
 				Commit = tip,
 				Tag = matchedTag,
 				Distance = distance,
-				Branch = (repo.Info.IsHeadUnborn || repo.Info.IsHeadDetached) ? "no branch" : repo.Head.Name
+				Branch = (repo.Info.IsHeadUnborn || repo.Info.IsHeadDetached) ? "no branch" : repo.Head.FriendlyName
 			};
 		}
 
