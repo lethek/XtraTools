@@ -48,7 +48,7 @@ namespace AirtimeBuildTasks
 				if (File.Exists(Source)) {
 					settings = XDocument
 						.Load(Source)
-						.XPathSelectElements("/appSettings/add")
+						.XPathSelectElements("/configuration/appSettings/add")
 						.ToDictionary(x => x.Attribute("key")?.Value, x => x.Attribute("value")?.Value)
 						.ToList();
 				} else {
