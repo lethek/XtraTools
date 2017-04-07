@@ -25,12 +25,12 @@ namespace AirtimeBuildTasks
 		public string Source { get; set; }
 
 		[Required]
+		public string OutputPath { get; set; }
+
+		[Required]
 		public string Namespace { get; set; }
 
 		public string Class { get; set; } = "Config";
-
-		[Required]
-		public string OutputPath { get; set; }
 
 		[Output]
 		public string GeneratedConfigPath { get; set; }
@@ -43,17 +43,20 @@ namespace AirtimeBuildTasks
 					return true;
 				}
 
-				if (!File.Exists(Source)) {
-					throw new Exception($"Could not find source \"{Source}\"");
+				IList<KeyValuePair<string, string>> settings;
+
+				if (File.Exists(Source)) {
+					settings = XDocument
+						.Load(Source)
+						.XPathSelectElements("/appSettings/add")
+						.ToDictionary(x => x.Attribute("key")?.Value, x => x.Attribute("value")?.Value)
+						.ToList();
+				} else {
+					Log.LogWarning($"Could not find source config file: \"{Source}\"");
+					settings = new List<KeyValuePair<string, string>>();
 				}
 
-				var data = XDocument
-					.Load(Source)
-					.XPathSelectElements("/appSettings/add")
-					.ToDictionary(x => x.Attribute("key")?.Value, x => x.Attribute("value")?.Value)
-					.ToList();
-
-				string code = GenerateConfigCode(Namespace, "Config", data);
+				string code = GenerateConfigCode(Namespace, Class, settings);
 
 				string tempFilePath = OutputPath == null
 					? Path.Combine(Path.GetTempPath(), $"{Namespace.Replace(".", "_")}_{Class}_{Path.GetRandomFileName().Replace(".", "")}.g.cs")
@@ -96,8 +99,7 @@ namespace AirtimeBuildTasks
 			var props = new CodeVariableReferenceExpression("props");
 			var prop = new CodeVariableReferenceExpression("prop");
 			var result = new CodeVariableReferenceExpression("result");
-
-
+			
 			var indexerInterface = new CodeTypeDeclaration("IIndexer") {
 				TypeAttributes = TypeAttributes.Public | TypeAttributes.Interface,
 				TypeParameters = { kTypeParam, vTypeParam },
@@ -106,7 +108,7 @@ namespace AirtimeBuildTasks
 						Name = "Item",
 						Type = new CodeTypeReference(vTypeParam),
 						HasGet = true,
-						Parameters = {new CodeParameterDeclarationExpression(new CodeTypeReference(kTypeParam), "key")}
+						Parameters = { new CodeParameterDeclarationExpression(new CodeTypeReference(kTypeParam), "key") }
 					}
 				}
 			};
@@ -139,12 +141,7 @@ namespace AirtimeBuildTasks
 					) {
 						Statements = {
 							new CodeVariableDeclarationStatement(typeof(PropertyInfo), "prop", new CodeArrayIndexerExpression(props, index)),
-							new CodeMethodInvokeExpression(
-								thisProperties,
-								"Add",
-								new CodePropertyReferenceExpression(prop, "Name"),
-								prop
-							)
+							new CodeMethodInvokeExpression(thisProperties, "Add", new CodePropertyReferenceExpression(prop, "Name"), prop)
 						}
 					}
 				}
@@ -267,7 +264,6 @@ namespace AirtimeBuildTasks
 				codeProvider.GenerateCodeFromCompileUnit(compileUnit, writer, new CodeGeneratorOptions { BlankLinesBetweenMembers = false });
 				return writer.ToString();
 			}
-
 		}
 
 	}

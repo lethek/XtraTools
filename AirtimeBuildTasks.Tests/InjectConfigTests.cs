@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Text;
 using System.Xml;
 
@@ -54,7 +51,7 @@ namespace AirtimeBuildTasks.Tests
 		}
 
 
-		private readonly ITestOutputHelper Output;
+		protected readonly ITestOutputHelper Output;
 
 
 		private const string ProjectXml =
