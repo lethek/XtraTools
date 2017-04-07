@@ -63,11 +63,13 @@ namespace AirtimeBuildTasks.Tests
 	<Target Name=""UnitTests"" BeforeTargets=""BeforeBuild;BeforeRebuild"">
 		<InjectConfigTask Source=""Settings.config"" Namespace=""Airtime"" OutputPath=""$(IntermediateOutputPath)"">
 			<Output ItemName=""Generated"" TaskParameter=""GeneratedConfigPath"" />
+			<Output PropertyName=""GeneratedCode"" TaskParameter=""GeneratedCode""/>
 		</InjectConfigTask>
 		<ItemGroup>
 			<Compile Include=""@(Generated)""/>
 			<FileWrites Include=""@(Generated)""/>
 		</ItemGroup>
+		<Message Text=""$(GeneratedCode)"" />
 	</Target>
 </Project>";
 

@@ -35,6 +35,9 @@ namespace AirtimeBuildTasks
 		[Output]
 		public string GeneratedConfigPath { get; set; }
 
+		[Output]
+		public string GeneratedCode { get; set; }
+
 
 		public override bool Execute()
 		{
@@ -56,7 +59,7 @@ namespace AirtimeBuildTasks
 					settings = new List<KeyValuePair<string, string>>();
 				}
 
-				string code = GenerateConfigCode(Namespace, Class, settings);
+				GeneratedCode = GenerateConfigCode(Namespace, Class, settings);
 
 				string tempFilePath = OutputPath == null
 					? Path.Combine(Path.GetTempPath(), $"{Namespace.Replace(".", "_")}_{Class}_{Path.GetRandomFileName().Replace(".", "")}.g.cs")
@@ -68,7 +71,7 @@ namespace AirtimeBuildTasks
 					Directory.CreateDirectory(tempFileDir);
 				}
 
-				File.WriteAllText(tempFilePath, code, Encoding.UTF8);
+				File.WriteAllText(tempFilePath, GeneratedCode, Encoding.UTF8);
 
 				GeneratedConfigPath = tempFilePath;
 				return true;
@@ -202,7 +205,7 @@ namespace AirtimeBuildTasks
 					setting => new CodeMemberProperty {
 						Attributes = MemberAttributes.Public | MemberAttributes.Static,
 						Type = stringType,
-						Name = setting.Key,
+						Name = "@" + SanitizePropertyName(setting.Key),
 						GetStatements = {
 							new CodeVariableDeclarationStatement(
 								stringType,
@@ -264,6 +267,26 @@ namespace AirtimeBuildTasks
 				codeProvider.GenerateCodeFromCompileUnit(compileUnit, writer, new CodeGeneratorOptions { BlankLinesBetweenMembers = false });
 				return writer.ToString();
 			}
+		}
+
+		private static string SanitizePropertyName(string s)
+		{
+			if (String.IsNullOrEmpty(s)) {
+				return s;
+			}
+			var sb = new StringBuilder();
+			foreach (char c in s) {
+				if (sb.Length == 0) {
+					if (Char.IsLetter(c) || c == '_') {
+						sb.Append(c);
+					}
+				} else {
+					if (Char.IsLetter(c) || Char.IsNumber(c) || c == '_') {
+						sb.Append(c);
+					}
+				}
+			}
+			return sb.ToString();
 		}
 
 	}
