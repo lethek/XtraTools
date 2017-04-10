@@ -41,19 +41,23 @@ namespace AirtimeBuildTasks
 
 		public override bool Execute()
 		{
-			try {
-				if (String.IsNullOrEmpty(Source)) {
-					return true;
-				}
+			if (String.IsNullOrEmpty(Source)) {
+				return true;
+			}
 
+			try {
 				IList<KeyValuePair<string, string>> settings;
 
 				if (File.Exists(Source)) {
 					settings = XDocument
 						.Load(Source)
 						.XPathSelectElements("/configuration/appSettings/add")
-						.ToDictionary(x => x.Attribute("key")?.Value, x => x.Attribute("value")?.Value)
+						.Select(x => new KeyValuePair<string, string>(x.Attribute("key")?.Value, x.Attribute("value")?.Value))
 						.ToList();
+
+					ThrowWhenDuplicateKeys(settings);
+					ThrowWhenDuplicateProperties(settings);
+
 				} else {
 					Log.LogWarning($"Could not find source config file: \"{Source}\"");
 					settings = new List<KeyValuePair<string, string>>();
@@ -77,8 +81,39 @@ namespace AirtimeBuildTasks
 				return true;
 
 			} catch (Exception ex) {
-				Log.LogErrorFromException(ex);
+				Log.LogErrorFromException(ex, false, false, Source);
 				return false;
+			}
+		}
+
+
+		private static void ThrowWhenDuplicateKeys(IEnumerable<KeyValuePair<string, string>> settings)
+		{
+
+			var duplicateKeys = settings
+				.GroupBy(s => s.Key)
+				.Where(g => g.Count() > 1)
+				.Select(g => g.Key)
+				.ToList();
+
+			if (duplicateKeys.Any()) {
+				var keys = String.Join(", ", duplicateKeys.ToArray());
+				throw new Exception($"Duplicate keys are not allowed: {keys}");
+			}
+		}
+
+
+		private static void ThrowWhenDuplicateProperties(IEnumerable<KeyValuePair<string, string>> settings)
+		{
+			var duplicateCollapsedKeys = settings
+				.GroupBy(s => SanitizePropertyName(s.Key))
+				.Where(g => g.Count() > 1)
+				.Select(g => g.Select(x => x.Key).Distinct())
+				.ToList();
+
+			if (duplicateCollapsedKeys.Any()) {
+				var keys = String.Join("; ", duplicateCollapsedKeys.Select(x => String.Join(", ", x)));
+				throw new Exception($"The following sets of keys are unsupported as they'll normalize to duplicate property names: {keys}");
 			}
 		}
 
