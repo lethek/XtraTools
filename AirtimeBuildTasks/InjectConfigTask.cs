@@ -13,6 +13,7 @@ using System.Xml.XPath;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Microsoft.CSharp;
+using Microsoft.VisualBasic;
 
 
 namespace AirtimeBuildTasks
@@ -31,6 +32,8 @@ namespace AirtimeBuildTasks
 		public string Namespace { get; set; }
 
 		public string Class { get; set; } = "Config";
+
+		public string CodeProvider { get; set; } = "CS";
 
 		[Output]
 		public string GeneratedConfigPath { get; set; }
@@ -57,20 +60,24 @@ namespace AirtimeBuildTasks
 
 					ThrowWhenDuplicateKeys(settings);
 					ThrowWhenDuplicateProperties(settings);
-
 				} else {
 					Log.LogWarning($"Could not find source config file: \"{Source}\"");
 					settings = new List<KeyValuePair<string, string>>();
 				}
 
-				GeneratedCode = GenerateConfigCode(Namespace, Class, settings);
+				var provider = CodeProvider.ToUpperInvariant() == "VB"
+					? (CodeDomProvider)new VBCodeProvider()
+					: (CodeDomProvider)new CSharpCodeProvider();
+
+				using (provider) {
+					GeneratedCode = GenerateConfigCode(provider, Namespace, Class, settings);
+				}
 
 				string tempFilePath = OutputPath == null
 					? Path.Combine(Path.GetTempPath(), $"{Namespace.Replace(".", "_")}_{Class}_{Path.GetRandomFileName().Replace(".", "")}.g.cs")
 					: Path.Combine(OutputPath, $"{Namespace.Replace(".", "_")}_{Class}.g.cs");
 
 				string tempFileDir = Path.GetDirectoryName(tempFilePath);
-
 				if (tempFileDir != null) {
 					Directory.CreateDirectory(tempFileDir);
 				}
@@ -89,7 +96,6 @@ namespace AirtimeBuildTasks
 
 		private static void ThrowWhenDuplicateKeys(IEnumerable<KeyValuePair<string, string>> settings)
 		{
-
 			var duplicateKeys = settings
 				.GroupBy(s => s.Key)
 				.Where(g => g.Count() > 1)
@@ -106,7 +112,7 @@ namespace AirtimeBuildTasks
 		private static void ThrowWhenDuplicateProperties(IEnumerable<KeyValuePair<string, string>> settings)
 		{
 			var duplicateCollapsedKeys = settings
-				.GroupBy(s => SanitizePropertyName(s.Key))
+				.GroupBy(s => NormalizePropertyName(s.Key))
 				.Where(g => g.Count() > 1)
 				.Select(g => g.Select(x => x.Key).Distinct())
 				.ToList();
@@ -118,17 +124,22 @@ namespace AirtimeBuildTasks
 		}
 
 
-		private static string GenerateConfigCode(string namespaceName, string className, IEnumerable<KeyValuePair<string, string>> settings)
+		private static string GenerateConfigCode(CodeDomProvider provider, string namespaceName, string className, IEnumerable<KeyValuePair<string, string>> settings)
 		{
+			namespaceName = provider.CreateEscapedIdentifier(namespaceName);
+			className = provider.CreateEscapedIdentifier(className);
+
 			var kTypeParam = new CodeTypeParameter("TKey");
 			var vTypeParam = new CodeTypeParameter("TValue");
 			var tTypeParam = new CodeTypeParameter("T");
 
 			var tType = new CodeTypeReference(tTypeParam);
+			var objectType = new CodeTypeReference(typeof(Object));
 			var stringType = new CodeTypeReference(typeof(String));
 			var propertyInfoType = new CodeTypeReference(typeof(PropertyInfo));
 			var stringIndexerType = new CodeTypeReference("IIndexer", stringType, stringType);
-			var configIndexerType = new CodeTypeReference("ConfigIndexer<" + className + ">");
+			var configIndexerType = new CodeTypeReference("ConfigIndexer", new CodeTypeReference(new CodeTypeParameter(className)));
+			var configGenericIndexerType = new CodeTypeReference("ConfigIndexer", new CodeTypeReference(tTypeParam));
 
 			var bindingFlags = new CodeTypeReferenceExpression(typeof(BindingFlags));
 			var configManager = new CodeTypeReferenceExpression("Microsoft.Azure.CloudConfigurationManager");
@@ -137,7 +148,8 @@ namespace AirtimeBuildTasks
 			var props = new CodeVariableReferenceExpression("props");
 			var prop = new CodeVariableReferenceExpression("prop");
 			var result = new CodeVariableReferenceExpression("result");
-			
+			var key = new CodeArgumentReferenceExpression("key");
+
 			var indexerInterface = new CodeTypeDeclaration("IIndexer") {
 				TypeAttributes = TypeAttributes.Public | TypeAttributes.Interface,
 				TypeParameters = { kTypeParam, vTypeParam },
@@ -146,7 +158,7 @@ namespace AirtimeBuildTasks
 						Name = "Item",
 						Type = new CodeTypeReference(vTypeParam),
 						HasGet = true,
-						Parameters = { new CodeParameterDeclarationExpression(new CodeTypeReference(kTypeParam), "key") }
+						Parameters = {new CodeParameterDeclarationExpression(new CodeTypeReference(kTypeParam), "key")}
 					}
 				}
 			};
@@ -154,7 +166,9 @@ namespace AirtimeBuildTasks
 			var configIndexerConstructor = new CodeConstructor {
 				Attributes = MemberAttributes.Assembly,
 				Statements = {
-					new CodeVariableDeclarationStatement(typeof(PropertyInfo[]), "props",
+					new CodeVariableDeclarationStatement(
+						typeof(PropertyInfo[]),
+						"props",
 						new CodeMethodInvokeExpression(
 							new CodeTypeOfExpression(tType),
 							"GetProperties",
@@ -185,18 +199,129 @@ namespace AirtimeBuildTasks
 				}
 			};
 
+			var normalizePropertyName = new CodeMemberMethod {
+				Attributes = MemberAttributes.Static | MemberAttributes.Private,
+				Name = "NormalizePropertyName",
+				ReturnType = stringType,
+				Parameters = { new CodeParameterDeclarationExpression(stringType, "key") },
+				Statements = {
+					new CodeConditionStatement(
+						new CodeMethodInvokeExpression(
+							new CodeTypeReferenceExpression(typeof(String)),
+							"IsNullOrEmpty",
+							key
+						),
+						new CodeMethodReturnStatement(key)
+					),
+					new CodeVariableDeclarationStatement(
+						typeof(StringBuilder),
+						"sb",
+						new CodeObjectCreateExpression(typeof(StringBuilder))
+					),
+					new CodeIterationStatement(
+						new CodeVariableDeclarationStatement(typeof(int), index.VariableName, new CodePrimitiveExpression(0)),
+						new CodeBinaryOperatorExpression(
+							index,
+							CodeBinaryOperatorType.LessThan,
+							new CodePropertyReferenceExpression(key, "Length")
+						),
+						new CodeAssignStatement(
+							index,
+							new CodeBinaryOperatorExpression(
+								index,
+								CodeBinaryOperatorType.Add,
+								new CodePrimitiveExpression(1)
+							)
+						),
+						new CodeVariableDeclarationStatement(
+							typeof(char),
+							"c",
+							new CodeArrayIndexerExpression(key, index)
+						),
+						new CodeConditionStatement(
+							new CodeBinaryOperatorExpression(
+								new CodePropertyReferenceExpression(new CodeVariableReferenceExpression("sb"), "Length"),
+								CodeBinaryOperatorType.ValueEquality,
+								new CodePrimitiveExpression(0)
+							),
+							trueStatements: new CodeStatement[] {
+								new CodeConditionStatement(
+									new CodeBinaryOperatorExpression(
+										new CodeMethodInvokeExpression(
+											new CodeTypeReferenceExpression(typeof(Char)),
+											"IsLetter",
+											new CodeVariableReferenceExpression("c")
+										),
+										CodeBinaryOperatorType.BooleanOr,
+										new CodeBinaryOperatorExpression(
+											new CodeVariableReferenceExpression("c"),
+											CodeBinaryOperatorType.ValueEquality,
+											new CodePrimitiveExpression('_')
+										)
+									),
+									new CodeExpressionStatement(
+										new CodeMethodInvokeExpression(
+											new CodeVariableReferenceExpression("sb"),
+											"Append",
+											new CodeVariableReferenceExpression("c")
+										)
+									)
+								)
+							},
+							falseStatements: new CodeStatement[] {
+								new CodeConditionStatement(
+									new CodeBinaryOperatorExpression(
+										new CodeMethodInvokeExpression(
+											new CodeTypeReferenceExpression(typeof(Char)),
+											"IsLetter",
+											new CodeVariableReferenceExpression("c")
+										),
+										CodeBinaryOperatorType.BooleanOr,
+										new CodeBinaryOperatorExpression(
+											new CodeMethodInvokeExpression(
+												new CodeTypeReferenceExpression(typeof(Char)),
+												"IsNumber",
+												new CodeVariableReferenceExpression("c")
+											),
+											CodeBinaryOperatorType.BooleanOr,
+											new CodeBinaryOperatorExpression(
+												new CodeVariableReferenceExpression("c"),
+												CodeBinaryOperatorType.ValueEquality,
+												new CodePrimitiveExpression('_')
+											)
+										)
+									),
+									new CodeExpressionStatement(
+										new CodeMethodInvokeExpression(
+											new CodeVariableReferenceExpression("sb"),
+											"Append",
+											new CodeVariableReferenceExpression("c")
+										)
+									)
+								)
+							}
+						)
+					),
+					new CodeMethodReturnStatement(
+						new CodeMethodInvokeExpression(new CodeVariableReferenceExpression("sb"), "ToString")
+					)
+				}
+			};
+
 			var configIndexerClass = new CodeTypeDeclaration("ConfigIndexer") {
 				TypeAttributes = TypeAttributes.NestedPrivate,
 				TypeParameters = { tTypeParam },
-				BaseTypes = { stringIndexerType },
+				BaseTypes = { objectType, stringIndexerType },
 				Members = {
 					configIndexerConstructor,
-					new CodeMemberField(typeof(IDictionary<string,PropertyInfo>), "_properties") {
+					normalizePropertyName,
+					new CodeMemberField(typeof(IDictionary<string, PropertyInfo>), "_properties") {
 						Attributes = MemberAttributes.Private,
 						InitExpression = new CodeObjectCreateExpression(typeof(Dictionary<string, PropertyInfo>))
 					},
 					new CodeMemberProperty {
 						Attributes = MemberAttributes.Public | MemberAttributes.Final,
+						ImplementationTypes = { stringIndexerType },
 						Name = "Item",
 						Type = stringType,
 						Parameters = {new CodeParameterDeclarationExpression(stringType, "key")},
@@ -219,7 +344,11 @@ namespace AirtimeBuildTasks
 								new CodeMethodInvokeExpression(
 									thisProperties,
 									"TryGetValue",
-									new CodeArgumentReferenceExpression("key"),
+									new CodeMethodInvokeExpression(
+										new CodeTypeReferenceExpression(configGenericIndexerType),
+										normalizePropertyName.Name,
+										key
+									),
 									new CodeDirectionExpression(FieldDirection.Out, prop)
 								),
 								new CodeMethodReturnStatement(
@@ -240,7 +369,7 @@ namespace AirtimeBuildTasks
 					setting => new CodeMemberProperty {
 						Attributes = MemberAttributes.Public | MemberAttributes.Static,
 						Type = stringType,
-						Name = "@" + SanitizePropertyName(setting.Key),
+						Name = provider.CreateEscapedIdentifier(NormalizePropertyName(setting.Key)),
 						GetStatements = {
 							new CodeVariableDeclarationStatement(
 								stringType,
@@ -270,7 +399,7 @@ namespace AirtimeBuildTasks
 					)
 				},
 				Members = {
-					new CodeConstructor { Attributes = MemberAttributes.Private },
+					new CodeConstructor {Attributes = MemberAttributes.Private},
 					new CodeMemberField {
 						Attributes = MemberAttributes.Private | MemberAttributes.Static,
 						Name = "_items",
@@ -297,14 +426,14 @@ namespace AirtimeBuildTasks
 			var compileUnit = new CodeCompileUnit();
 			compileUnit.Namespaces.Add(configNamespace);
 
-			using (var codeProvider = new CSharpCodeProvider())
 			using (var writer = new StringWriter()) {
-				codeProvider.GenerateCodeFromCompileUnit(compileUnit, writer, new CodeGeneratorOptions { BlankLinesBetweenMembers = false });
+				provider.GenerateCodeFromCompileUnit(compileUnit, writer, new CodeGeneratorOptions { BlankLinesBetweenMembers = false });
 				return writer.ToString();
 			}
 		}
 
-		private static string SanitizePropertyName(string s)
+
+		private static string NormalizePropertyName(string s)
 		{
 			if (String.IsNullOrEmpty(s)) {
 				return s;

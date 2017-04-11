@@ -61,7 +61,7 @@ namespace AirtimeBuildTasks.Tests
 		<IntermediateOutputPath Condition=""$(IntermediateOutputPath) == '' Or $(IntermediateOutputPath) == '*Undefined*'"">$(MSBuildProjectDirectory)\obj\$(Configuration)</IntermediateOutputPath>
 	</PropertyGroup>
 	<Target Name=""InjectConfig"" BeforeTargets=""CoreCompile"">
-		<InjectConfigTask Source=""Settings.config"" Namespace=""Airtime"" OutputPath=""$(IntermediateOutputPath)"">
+		<InjectConfigTask Source=""Settings.config"" Namespace=""Airtime"" OutputPath=""$(IntermediateOutputPath)"" CodeProvider=""CS"">
 			<Output ItemName=""Generated"" TaskParameter=""GeneratedConfigPath"" />
 			<Output PropertyName=""GeneratedCode"" TaskParameter=""GeneratedCode""/>
 		</InjectConfigTask>
