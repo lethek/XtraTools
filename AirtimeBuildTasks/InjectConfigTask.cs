@@ -380,7 +380,7 @@ namespace AirtimeBuildTasks
 								result.VariableName,
 								new CodeIndexerExpression(
 									new CodePropertyReferenceExpression(configManager, "AppSettings"),
-									new CodeArgumentReferenceExpression(setting.Key)
+									new CodePrimitiveExpression(setting.Key)
 								)
 							),
 							new CodeConditionStatement(
