@@ -2,6 +2,7 @@
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -142,7 +143,7 @@ namespace AirtimeBuildTasks
 			var configGenericIndexerType = new CodeTypeReference("ConfigIndexer", new CodeTypeReference(tTypeParam));
 
 			var bindingFlags = new CodeTypeReferenceExpression(typeof(BindingFlags));
-			var configManager = new CodeTypeReferenceExpression("Microsoft.Azure.CloudConfigurationManager");
+			var configManager = new CodeTypeReferenceExpression(typeof(ConfigurationManager));
 			var thisProperties = new CodeFieldReferenceExpression(new CodeThisReferenceExpression(), "_properties");
 			var index = new CodeVariableReferenceExpression("index");
 			var props = new CodeVariableReferenceExpression("props");
@@ -329,7 +330,10 @@ namespace AirtimeBuildTasks
 							new CodeVariableDeclarationStatement(
 								stringType,
 								result.VariableName,
-								new CodeMethodInvokeExpression(configManager, "GetSetting", new CodeArgumentReferenceExpression("key"))
+								new CodeIndexerExpression(
+									new CodePropertyReferenceExpression(configManager, "AppSettings"),
+									new CodeArgumentReferenceExpression("key")
+								)
 							),
 							new CodeConditionStatement(
 								new CodeBinaryOperatorExpression(
@@ -374,7 +378,10 @@ namespace AirtimeBuildTasks
 							new CodeVariableDeclarationStatement(
 								stringType,
 								result.VariableName,
-								new CodeMethodInvokeExpression(configManager, "GetSetting", new CodePrimitiveExpression(setting.Key))
+								new CodeIndexerExpression(
+									new CodePropertyReferenceExpression(configManager, "AppSettings"),
+									new CodeArgumentReferenceExpression(setting.Key)
+								)
 							),
 							new CodeConditionStatement(
 								new CodeBinaryOperatorExpression(
