@@ -3,6 +3,7 @@ using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -289,14 +290,22 @@ namespace XtraTools.Tasks
 				.ToArray();
 
 			var configClass = new CodeTypeDeclaration(baseName) {
-				TypeAttributes = TypeAttributes.Public | TypeAttributes.Sealed,
+				TypeAttributes = (internalClass ? TypeAttributes.NestedAssembly : TypeAttributes.Public) | TypeAttributes.Sealed,
 				CustomAttributes = {
+					new CodeAttributeDeclaration(
+						new CodeTypeReference(typeof(GeneratedCodeAttribute), CodeTypeReferenceOptions.GlobalReference),
+						new CodeAttributeArgument(new CodePrimitiveExpression(StronglyTypedConfigBuilderType.FullName)),
+						new CodeAttributeArgument(new CodePrimitiveExpression(StronglyTypedConfigBuilderType.Assembly.GetName().Version.ToString()))
+					),
+					new CodeAttributeDeclaration(
+						new CodeTypeReference(typeof(DebuggerNonUserCodeAttribute), CodeTypeReferenceOptions.GlobalReference)
+					),
 					new CodeAttributeDeclaration(
 						new CodeTypeReference(typeof(CompilerGeneratedAttribute), CodeTypeReferenceOptions.GlobalReference)
 					)
 				},
 				Members = {
-					new CodeConstructor {Attributes = MemberAttributes.Private},
+					new CodeConstructor { Attributes = MemberAttributes.Private },
 					new CodeMemberField {
 						Attributes = MemberAttributes.Private | MemberAttributes.Static,
 						Name = "_items",
@@ -346,6 +355,9 @@ namespace XtraTools.Tasks
 			}
 			return provider.CreateEscapedIdentifier(sb.ToString());
 		}
+
+
+		private static readonly Type StronglyTypedConfigBuilderType = typeof(StronglyTypedConfigBuilder);
 
 	}
 

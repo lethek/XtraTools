@@ -34,6 +34,8 @@ namespace XtraTools.Tasks
 
 		public string CodeProvider { get; set; } = "CS";
 
+		public bool InternalClass { get; set; } = false;
+
 		[Output]
 		public string GeneratedConfigPath { get; set; }
 
@@ -70,7 +72,7 @@ namespace XtraTools.Tasks
 					}
 
 					using (var writer = new StringWriter()) {
-						var ccu = StronglyTypedConfigBuilder.Create(settings, Class, Namespace, provider, false);
+						var ccu = StronglyTypedConfigBuilder.Create(settings, Class, Namespace, provider, InternalClass);
 						provider.GenerateCodeFromCompileUnit(ccu, writer, new CodeGeneratorOptions { BlankLinesBetweenMembers = false });
 						GeneratedCode = writer.ToString();
 					}
