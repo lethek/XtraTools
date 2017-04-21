@@ -17,10 +17,12 @@ using Microsoft.CSharp;
 using Microsoft.VisualBasic;
 
 
-namespace AirtimeBuildTasks
+namespace XtraTools.Tasks
 {
 
-	public class InjectConfigTask : Task
+	[Serializable]
+	[LoadInSeparateAppDomain]
+	public class XtraConfigTask : AppDomainIsolatedTask
 	{
 
 		[Required]

@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 
 
-namespace AirtimeBuildTasks
+namespace XtraTools.Tasks
 {
 
 	public static class ExtendString

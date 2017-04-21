@@ -10,13 +10,13 @@ using Xunit;
 using Xunit.Abstractions;
 
 
-namespace AirtimeBuildTasks.Tests
+namespace XtraTools.Tests
 {
 
-	public class InjectConfigTests
+	public class XtraConfigTests
 	{
 
-		public InjectConfigTests(ITestOutputHelper output)
+		public XtraConfigTests(ITestOutputHelper output)
 		{
 			Output = output;
 		}
@@ -56,15 +56,15 @@ namespace AirtimeBuildTasks.Tests
 
 		private const string ProjectXml =
 @"<Project xmlns=""http://schemas.microsoft.com/developer/msbuild/2003"">
-	<UsingTask AssemblyFile=""AirtimeBuildTasks.dll"" TaskName=""InjectConfigTask"" />
+	<UsingTask AssemblyFile=""XtraConfigTask.dll"" TaskName=""XtraConfigTask"" />
 	<PropertyGroup>
 		<IntermediateOutputPath Condition=""$(IntermediateOutputPath) == '' Or $(IntermediateOutputPath) == '*Undefined*'"">$(MSBuildProjectDirectory)\obj\$(Configuration)</IntermediateOutputPath>
 	</PropertyGroup>
 	<Target Name=""InjectConfig"" BeforeTargets=""CoreCompile"">
-		<InjectConfigTask Source=""Settings.config"" Namespace=""Airtime"" OutputPath=""$(IntermediateOutputPath)"" CodeProvider=""CS"">
+		<XtraConfigTask Source=""Settings.config"" Namespace=""Xtra"" OutputPath=""$(IntermediateOutputPath)"" CodeProvider=""CS"">
 			<Output ItemName=""Generated"" TaskParameter=""GeneratedConfigPath"" />
 			<Output PropertyName=""GeneratedCode"" TaskParameter=""GeneratedCode""/>
-		</InjectConfigTask>
+		</XtraConfigTask>
 		<ItemGroup>
 			<Compile Include=""@(Generated)""/>
 			<FileWrites Include=""@(Generated)""/>

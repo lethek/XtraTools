@@ -9,7 +9,8 @@ using System.Xml.XPath;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
-namespace AirtimeBuildTasks
+
+namespace XtraTools.Tasks
 {
 
     public class ManageCulturesTask : Task

@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("AirtimeBuildTasks.Tests")]
+[assembly: AssemblyTitle("GenerateVersionInfoFromGitTask")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("AirtimeBuildTasks.Tests")]
-[assembly: AssemblyCopyright("Copyright ©  2017")]
+[assembly: AssemblyCompany("Xtra Insights")]
+[assembly: AssemblyProduct("GenerateVersionInfoFromGitTask")]
+[assembly: AssemblyCopyright("Copyright © 2015 Michael Monsour")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("394f6f56-5e66-4ce5-9117-81c04b9d91f5")]
+[assembly: Guid("8449d8bc-46e0-4a7c-910b-df5376d55128")]
 
 // Version information for an assembly consists of the following four values:
 //

@@ -9,7 +9,8 @@ using LibGit2Sharp;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 
-namespace AirtimeBuildTasks
+
+namespace XtraTools.Tasks
 {
 
 	public class GenerateVersionInfoFromGitTask : Task
@@ -134,7 +135,7 @@ namespace AirtimeBuildTasks
 		}
 
 
-		private readonly static Regex VersionNumberPattern = new Regex(@"(?<major>\d+)(\.(?<minor>\d+))?(\.(?<build>\d+))?(\.(?<revision>\d+))?", RegexOptions.Compiled);
+		private static readonly Regex VersionNumberPattern = new Regex(@"(?<major>\d+)(\.(?<minor>\d+))?(\.(?<build>\d+))?(\.(?<revision>\d+))?", RegexOptions.Compiled);
 
 	}
 
